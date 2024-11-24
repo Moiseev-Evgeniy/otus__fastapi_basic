@@ -26,7 +26,7 @@ def init_app() -> FastAPI:
         logging.config.dictConfig(log_config)
     app = FastAPI(
         debug=settings.settings.DEBUG,
-        title="Fake ml service",
+        title="Fake currency prediction service",
         middleware=[get_cors_middleware(settings.settings.CORS_ORIGINS)],
     )
     app.include_router(router)
