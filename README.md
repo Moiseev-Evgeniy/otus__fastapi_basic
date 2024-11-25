@@ -34,7 +34,7 @@ poetry install
 python src/main.py
 ```
 
-Запуск в докере:
+Запуск в докере:<br>
 1)
 ```bash 
 docker build --tag otus_fastapi_basic .
