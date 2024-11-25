@@ -3,7 +3,7 @@
 from fastapi import Query
 from pydantic import BaseModel, Field
 
-from src.utils.enums import CurrencyPair, Message
+from utils.enums import CurrencyPair, Message
 
 
 class SignsDTO(BaseModel):

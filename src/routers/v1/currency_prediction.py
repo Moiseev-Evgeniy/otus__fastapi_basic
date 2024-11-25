@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from src.dto.schemas.currency_prediction import PredictionResponse, SignsDTO
-from src.services.currency_prediction import CurrencyPredictionService
+from dto.schemas.currency_prediction import PredictionResponse, SignsDTO
+from services.currency_prediction import CurrencyPredictionService
 
 router = APIRouter(prefix="/currency_prediction", tags=["Currency prediction"])
 

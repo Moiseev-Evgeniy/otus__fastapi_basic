@@ -1,4 +1,4 @@
-#  Scoring service
+#  Fake currency prediction service
 
 ## Открыть приложение (локально)
 
@@ -7,7 +7,7 @@
 
 ## Настройка
 
-Необходимо создать файл `.env` в корне проекта и заполнить его по примеру `.env.template`
+Для добавления своих параметров сервера, опционально можно создать файл `.env` в корне проекта и заполнить его по примеру `.env.template`
 
 Для установки зависимостей:
 
@@ -24,41 +24,22 @@ poetry add <package_name>
 ```bash
 poetry lock
 poetry install
-``` 
-
-## Миграции
-
-Для работы с alembic необходимо находиться в директории `src`.
-Локально для работы с alembic необходимо отключить VPN.
-
-Для генерации миграции:
-
-```bash
-alembic revision --autogenerate -m "migration_name"
 ```
 
-После чего необходимо в миграции вручную изменить 'schema' на схему из settings файла settings.py(по умолчанию 'public')
+## Запуск
 
-Для применения миграции:
+Для запуска необходимо перейти в директорию `fastapi_basic` запустить команду:
 
 ```bash
-alembic upgrade head
+python src/main.py
 ```
-Для отката миграции:
 
-```bash
-alembic downgrade -1
+Запуск в докере:
+1)
+```bash 
+docker build --tag otus_fastapi_basic .
 ```
-## Мэйкфайл
-
-Для удобства работы с проектом в корне проекта находится Makefile со следующими командами:
-
+2)
 ```bash
-make lint # запуск линтера
-make test # запуск тестов
-make format # запуск форматирования кода
-make lint-fix # запуск линтера с фиксом ошибок
-make check # запуск линтера, форматера и тестов
-make check-fix # запуск линтера с фиксом ошибок, форматера и тестов
-make run_db # запуск контейнера с базой данных
+docker run -d -p 8000:8000 otus_fastapi_basic
 ```

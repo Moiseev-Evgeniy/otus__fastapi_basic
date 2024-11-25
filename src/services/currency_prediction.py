@@ -2,8 +2,8 @@
 
 from random import uniform
 
-from src.dto.schemas.currency_prediction import SignsDTO
-from src.utils.enums import Message
+from dto.schemas.currency_prediction import SignsDTO
+from utils.enums import Message
 
 
 class CurrencyPredictionService:

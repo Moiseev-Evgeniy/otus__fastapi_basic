@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from src.routers.v1.currency_prediction import router as currency_prediction_router
+from routers.v1.currency_prediction import router as currency_prediction_router
 
 
 router = APIRouter(prefix="/api/v1")
