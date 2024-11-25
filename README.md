@@ -39,7 +39,7 @@ python src/main.py
 ```bash 
 docker build --tag otus_fastapi_basic .
 ```
-2.
+<br>2.
 ```bash
 docker run -d -p 8000:8000 otus_fastapi_basic
 ```
