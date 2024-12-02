@@ -12,3 +12,15 @@ class CurrencyPair(StrEnum):
 class Message(StrEnum):
     ok = "Just do it!"
     not_ok = "Be careful!"
+
+
+class UserRole(StrEnum):
+    admin = "admin"
+    subscriber = "subscriber"
+    user = "user"
+    incognito = "incognito"
+
+
+class TokenType(StrEnum):
+    access = "acc"
+    refresh = "ref"
