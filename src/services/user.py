@@ -5,7 +5,6 @@ from fastapi import status, HTTPException
 from sqlalchemy.exc import IntegrityError
 from user_agents import parse
 
-from common.errors import DBConflictError
 from common.settings import settings
 from db.connector import AsyncSession
 from dto.schemas.users import UserCreate, Tokens
@@ -17,16 +16,15 @@ from utils.enums import UserRole
 class UserService:
 
     @classmethod
-    async def register_user(cls, user: UserCreate, user_agent: str):
+    async def register_user(cls, user: UserCreate, user_agent: str) -> dict[str, str]:
 
         user_id = await cls.add_user(user)
         access_token, refresh_token = await cls.get_tokens(user_id, user.role, user_agent)
 
-        return Tokens(access_token=access_token, refresh_token=refresh_token)
+        return dict(access_token=access_token, refresh_token=refresh_token)
 
     @staticmethod
     async def add_user(user: UserCreate) -> uuid4:
-
         user.pwd = get_hashed_pwd(user.pwd)
 
         async with AsyncSession() as session:
