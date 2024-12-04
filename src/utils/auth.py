@@ -14,6 +14,10 @@ def get_hashed_pwd(pwd: str) -> str:
     return pwd_context.hash(pwd)
 
 
+def verify_pwd(plain_pwd: str, hashed_pwd: str) -> bool:
+    return pwd_context.verify(plain_pwd, hashed_pwd)
+
+
 def create_tokens(data: dict, access_time_delta: int, refresh_time_delta: int):
     to_encode = data.copy()
     datetime_now = datetime.now(timezone.utc)
@@ -37,3 +41,4 @@ def create_tokens(data: dict, access_time_delta: int, refresh_time_delta: int):
     )
 
     return access_token, refresh_token, refresh_jti
+

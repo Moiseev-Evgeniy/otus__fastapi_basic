@@ -1,30 +1,56 @@
 """User service."""
 from uuid import uuid4
 
-from fastapi import status, HTTPException
+from pydantic import validate_email
+from pydantic_core import PydanticCustomError
+from fastapi import status, HTTPException, Response
 from sqlalchemy.exc import IntegrityError
 from user_agents import parse
 
 from common.settings import settings
 from db.connector import AsyncSession
-from dto.schemas.users import UserCreate, Tokens
+from dto.schemas.users import UserCreate, UserAuth
 from repositories.users import UsersRepository
-from utils.auth import get_hashed_pwd, create_tokens
+from utils.auth import get_hashed_pwd, create_tokens, verify_pwd
 from utils.enums import UserRole
 
 
 class UserService:
 
     @classmethod
-    async def register_user(cls, user: UserCreate, user_agent: str) -> dict[str, str]:
+    async def register(cls, user: UserCreate, user_agent: str, response: Response) -> None:
 
-        user_id = await cls.add_user(user)
-        access_token, refresh_token = await cls.get_tokens(user_id, user.role, user_agent)
+        user_id = await cls._add_user(user)
+        access_token, refresh_token = await cls._get_tokens(user_id, user.role, user_agent)
 
-        return dict(access_token=access_token, refresh_token=refresh_token)
+        response.set_cookie(key="access_token", value=access_token, httponly=True)
+        response.set_cookie(key="refresh_token", value=refresh_token, httponly=True)
+
+    @classmethod
+    async def login(cls, user: UserAuth, user_agent: str, response: Response) -> None:
+
+        is_email = True
+        try:
+            validate_email(user.login_or_email)
+            user.login_or_email = user.login_or_email.lower()
+        except PydanticCustomError:
+            is_email = False
+
+        async with AsyncSession() as session:
+            user_from_db = await UsersRepository.get_user(
+                session, user.login_or_email, "email" if is_email else "login"
+            )
+
+        if not user_from_db or not verify_pwd(user.pwd, user_from_db.hashed_pwd):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User unauthorized")
+
+        access_token, refresh_token = await cls._get_tokens(user_from_db.id, user_from_db.role, user_agent)
+
+        response.set_cookie(key="access_token", value=access_token, httponly=True)
+        response.set_cookie(key="refresh_token", value=refresh_token, httponly=True)
 
     @staticmethod
-    async def add_user(user: UserCreate) -> uuid4:
+    async def _add_user(user: UserCreate) -> uuid4:
         user.pwd = get_hashed_pwd(user.pwd)
 
         async with AsyncSession() as session:
@@ -37,7 +63,7 @@ class UserService:
         return user_id
 
     @staticmethod
-    async def get_tokens(user_id: uuid4, user_role: UserRole, user_agent: str) -> tuple[str, str]:
+    async def _get_tokens(user_id: uuid4, user_role: UserRole, user_agent: str) -> tuple[str, str]:
         user_agent = str(parse(user_agent))
 
         token_data = {"sub": {"user_id": str(user_id), "user_agent": user_agent, "role": user_role}}
