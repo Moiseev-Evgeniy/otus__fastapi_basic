@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, delete, and_
 
 from db.connector import AsyncSession
 from db.tables import User, Token
@@ -22,7 +22,7 @@ class UsersRepository:
 
     @staticmethod
     async def get_user_data(session: AsyncSession, value: str, column_name: str) -> User | None:
-        query = select(User.id, User.hashed_pwd).where(getattr(User, column_name) == value)
+        query = select(User.id, User.hashed_pwd, User.role).where(getattr(User, column_name) == value)
         result = await session.execute(query)
         return result.one_or_none()
 
@@ -31,3 +31,8 @@ class UsersRepository:
         query = select(User).where(User.id == user_id)
         result = await session.execute(query)
         return result.scalar()
+
+    @staticmethod
+    async def delete_refresh_token(session: AsyncSession, user_id: str, user_agent: str):
+        query = delete(Token).where(and_(Token.subject == user_id, Token.user_agent == user_agent))
+        await session.execute(query)

@@ -54,6 +54,10 @@ def get_token(request: Request) -> str:
 
 
 async def get_current_user(token: str = Depends(get_token)) -> User:
+    header = jwt.get_unverified_header(token)
+    if (token_type := header.get("typ")) and token_type != TokenType.access:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token data")
+
     try:
         token_data = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except jwt.PyJWTError as e:
@@ -65,7 +69,7 @@ async def get_current_user(token: str = Depends(get_token)) -> User:
     async with AsyncSession() as session:
         user = await UsersRepository.get_user(session, user_id)
 
-    if not user:
+    if not user or token_data.get("role") != user.role:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token data")
 
     return user
