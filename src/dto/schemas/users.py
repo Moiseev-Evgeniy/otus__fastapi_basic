@@ -21,8 +21,7 @@ class UserCreate(UserBase):
     pwd: str = Field(min_length=5, max_length=30, serialization_alias="hashed_pwd")
 
 
-class Tokens(BaseModel):
-    access_token: str
+class RefreshToken(BaseModel):
     refresh_token: str
 
 

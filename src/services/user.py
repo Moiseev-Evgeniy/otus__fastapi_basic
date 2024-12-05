@@ -18,16 +18,16 @@ from utils.enums import UserRole
 class UserService:
 
     @classmethod
-    async def register(cls, user: UserCreate, user_agent: str, response: Response) -> None:
+    async def register(cls, user: UserCreate, user_agent: str, response: Response) -> dict:
 
         user_id = await cls._add_user(user)
-        access_token, refresh_token = await cls._get_tokens(user_id, user.role, user_agent)
+        access_token, refresh_token = await cls._get_tokens(user_id, user_agent)
 
         response.set_cookie(key="access_token", value=access_token, httponly=True)
-        response.set_cookie(key="refresh_token", value=refresh_token, httponly=True)
+        return dict(refresh_token=refresh_token)
 
     @classmethod
-    async def login(cls, user: UserAuth, user_agent: str, response: Response) -> None:
+    async def login(cls, user: UserAuth, user_agent: str, response: Response) -> dict:
 
         is_email = True
         try:
@@ -37,17 +37,17 @@ class UserService:
             is_email = False
 
         async with AsyncSession() as session:
-            user_from_db = await UsersRepository.get_user(
+            user_data_from_db = await UsersRepository.get_user_data(
                 session, user.login_or_email, "email" if is_email else "login"
             )
 
-        if not user_from_db or not verify_pwd(user.pwd, user_from_db.hashed_pwd):
+        if not user_data_from_db or not verify_pwd(user.pwd, user_data_from_db.hashed_pwd):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User unauthorized")
 
-        access_token, refresh_token = await cls._get_tokens(user_from_db.id, user_from_db.role, user_agent)
+        access_token, refresh_token = await cls._get_tokens(user_data_from_db.id, user_agent)
 
         response.set_cookie(key="access_token", value=access_token, httponly=True)
-        response.set_cookie(key="refresh_token", value=refresh_token, httponly=True)
+        return dict(refresh_token=refresh_token)
 
     @staticmethod
     async def _add_user(user: UserCreate) -> uuid4:
@@ -63,10 +63,10 @@ class UserService:
         return user_id
 
     @staticmethod
-    async def _get_tokens(user_id: uuid4, user_role: UserRole, user_agent: str) -> tuple[str, str]:
+    async def _get_tokens(user_id: uuid4, user_agent: str) -> tuple[str, str]:
         user_agent = str(parse(user_agent))
 
-        token_data = {"sub": {"user_id": str(user_id), "user_agent": user_agent, "role": user_role}}
+        token_data = {"sub": str(user_id), "user_agent": user_agent}
         access_token, refresh_token, refresh_jti = create_tokens(
             token_data, settings.ACCESS_TOKEN_EXPIRE_MINUTES, settings.REFRESH_TOKEN_EXPIRE_MINUTES
         )
