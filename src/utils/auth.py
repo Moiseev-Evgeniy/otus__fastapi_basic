@@ -22,7 +22,7 @@ def verify_pwd(plain_pwd: str, hashed_pwd: str) -> bool:
     return pwd_context.verify(plain_pwd, hashed_pwd)
 
 
-def create_tokens(data: dict, access_time_delta: int, refresh_time_delta: int):
+def create_tokens(data: dict, access_time_delta: int, refresh_time_delta: int) -> tuple[str, str, str]:
     to_encode = data.copy()
     datetime_now = datetime.now(timezone.utc)
     expire = datetime_now + timedelta(minutes=access_time_delta)
@@ -54,22 +54,46 @@ def get_token(request: Request) -> str:
 
 
 async def get_current_user(token: str = Depends(get_token)) -> User:
-    header = jwt.get_unverified_header(token)
-    if (token_type := header.get("typ")) and token_type != TokenType.access:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token data")
+    check_token_type(token, TokenType.access)
 
     try:
-        token_data = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except jwt.PyJWTError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
-    if not (user_id := token_data.get("sub")):
+    if not (user_id := payload.get("sub")):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     async with AsyncSession() as session:
         user = await UsersRepository.get_user(session, user_id)
 
-    if not user or token_data.get("role") != user.role:
+    if not user or payload.get("role") != user.role:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token data")
 
     return user
+
+
+def check_token_type(token: str, required_type: TokenType) -> None:
+    header = jwt.get_unverified_header(token)
+    if (token_type := header.get("typ")) and token_type != required_type:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token data")
+
+
+async def get_refresh_token_payload(token: str) -> dict:
+    try:
+        payload = jwt.decode(token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+
+    except jwt.ExpiredSignatureError as e:
+        payload = jwt.decode(
+            token, key=settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_exp": False}
+        )
+        async with AsyncSession() as session:
+            await UsersRepository.delete_refresh_token_by_jti(session, payload.get("jti"))
+            await session.commit()
+
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    except jwt.PyJWTError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+    return payload

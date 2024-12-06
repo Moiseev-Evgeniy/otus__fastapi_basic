@@ -34,8 +34,18 @@ async def user_login(request: Request, response: Response, user: UserAuth):
     summary="User logout",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def user_login(request: Request, response: Response, user: User = Depends(allowed_for_admin_subscriber_user)):
+async def user_logout(request: Request, response: Response, user: User = Depends(allowed_for_admin_subscriber_user)):
     await UserService.logout(user, request.headers["user-agent"], response)
+
+
+@router.post(
+    "/refresh",
+    # response_model=RefreshToken,
+    summary="Refresh tokens",
+    response_description="Tokens in cookie and in body",
+)
+async def refresh_tokens(request: Request, response: Response, refresh_token: RefreshToken):
+    return await UserService.refresh(refresh_token, request.headers["user-agent"], response)
 
 
 @router.get(

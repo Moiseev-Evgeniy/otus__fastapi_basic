@@ -10,10 +10,10 @@ from user_agents import parse
 from common.settings import settings
 from db.connector import AsyncSession
 from db.tables import User
-from dto.schemas.users import UserCreate, UserAuth
+from dto.schemas.users import UserCreate, UserAuth, RefreshToken
 from repositories.users import UsersRepository
-from utils.auth import get_hashed_pwd, create_tokens, verify_pwd
-from utils.enums import UserRole
+from utils.auth import get_hashed_pwd, create_tokens, verify_pwd, check_token_type, get_refresh_token_payload
+from utils.enums import UserRole, TokenType
 
 
 class UserService:
@@ -22,7 +22,7 @@ class UserService:
     async def register(cls, user: UserCreate, user_agent: str, response: Response) -> dict:
 
         user_id = await cls._add_user(user)
-        access_token, refresh_token = await cls._get_tokens(user_id, user.role, user_agent)
+        access_token, refresh_token = await cls._get_tokens(user_id, user.role, str(parse(user_agent)))
 
         response.set_cookie(key="access_token", value=access_token, httponly=True)
         return dict(refresh_token=refresh_token)
@@ -45,21 +45,47 @@ class UserService:
         if not user_data_from_db or not verify_pwd(user.pwd, user_data_from_db.hashed_pwd):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User unauthorized")
 
-        access_token, refresh_token = await cls._get_tokens(user_data_from_db.id, user_data_from_db.role, user_agent)
+        access_token, refresh_token = await cls._get_tokens(
+            user_data_from_db.id, user_data_from_db.role, str(parse(user_agent))
+        )
 
         response.set_cookie(key="access_token", value=access_token, httponly=True)
         return dict(refresh_token=refresh_token)
 
-    @classmethod
-    async def logout(cls, user: User, user_agent: str, response: Response):
+    @staticmethod
+    async def logout(user: User, user_agent: str, response: Response) -> None:
         response.delete_cookie(key="access_token", httponly=True)
 
         async with AsyncSession() as session:
-            await UsersRepository.delete_refresh_token(session, user.id, str(parse(user_agent)))
+            await UsersRepository.delete_refresh_token_by_user_data(session, user.id, str(parse(user_agent)))
             try:
                 await session.commit()
             except IntegrityError as e:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{e.args[0].split('DETAIL:')[1]}")
+
+    @classmethod
+    async def refresh(cls, refresh_token: RefreshToken, user_agent, response: Response):
+        user_agent = str(parse(user_agent))
+        check_token_type(refresh_token.refresh_token, TokenType.refresh)
+
+        payload = await get_refresh_token_payload(refresh_token.refresh_token)
+
+        async with AsyncSession() as session:
+            if (
+                    not (token_data_from_db := await UsersRepository.get_token_data_by_jti(session, payload.get("jti")))
+                    or user_agent != token_data_from_db.user_agent
+            ):
+                await UsersRepository.delete_tokens_by_user_id(session, payload.get("sub"))
+                await session.commit()
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Invalid token")
+
+            await UsersRepository.delete_refresh_token_by_jti(session, payload.get("jti"))
+            await session.commit()
+
+        access_token, refresh_token = await cls._get_tokens(payload.get("sub"), payload.get("role"), user_agent)
+
+        response.set_cookie(key="access_token", value=access_token, httponly=True)
+        return dict(refresh_token=refresh_token)
 
     @staticmethod
     async def _add_user(user: UserCreate) -> uuid4:
@@ -75,8 +101,7 @@ class UserService:
         return user_id
 
     @staticmethod
-    async def _get_tokens(user_id: uuid4, role: UserRole, user_agent: str) -> tuple[str, str]:
-        user_agent = str(parse(user_agent))
+    async def _get_tokens(user_id: uuid4, role: UserRole | str, user_agent: str) -> tuple[str, str]:
 
         token_data = {"sub": str(user_id), "role": role, "user_agent": user_agent}
         access_token, refresh_token, refresh_jti = create_tokens(
