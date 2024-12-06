@@ -48,7 +48,6 @@ class UserService:
         access_token, refresh_token = await cls._get_tokens(
             user_data_from_db.id, user_data_from_db.role, str(parse(user_agent))
         )
-
         response.set_cookie(key="access_token", value=access_token, httponly=True)
         return dict(refresh_token=refresh_token)
 
@@ -64,7 +63,7 @@ class UserService:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{e.args[0].split('DETAIL:')[1]}")
 
     @classmethod
-    async def refresh(cls, refresh_token: RefreshToken, user_agent, response: Response):
+    async def refresh(cls, refresh_token: RefreshToken, user_agent, response: Response) -> dict:
         user_agent = str(parse(user_agent))
         check_token_type(refresh_token.refresh_token, TokenType.refresh)
 
