@@ -40,7 +40,7 @@ async def user_logout(request: Request, response: Response, user: User = Depends
 
 @router.post(
     "/refresh",
-    # response_model=RefreshToken,
+    response_model=RefreshToken,
     summary="Refresh tokens",
     response_description="Tokens in cookie and in body",
 )
