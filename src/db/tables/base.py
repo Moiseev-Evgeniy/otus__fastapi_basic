@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import Column, DateTime, func, UUID, Integer
+from sqlalchemy import Column, DateTime, func, UUID
 
 from db.declarative import Base
 
